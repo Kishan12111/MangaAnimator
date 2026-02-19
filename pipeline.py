@@ -293,19 +293,34 @@ class MangaVideoPipeline:
             self._logger.end_stage("Story Analysis")
             logger.info(f"Generated script with {len(story_output.summary_script.split())} words")
             
-            # Generate AI intro image (non-blocking — falls back to blurred panel)
+            # Generate AI intro image (non-blocking — falls back to best panel)
             intro_image = None
             try:
+                # Pass character_details so intro image can prioritize characters
+                char_details = story_output.metadata.get('character_details', [])
                 intro_image = self.story_intelligence.generate_intro_image(
                     summary=story_output.summary_script,
                     tone=story_output.tone,
                     characters=story_output.characters,
                     manga_title=getattr(self.config, 'anime_title', '') or title,
+                    character_details=char_details,
                 )
                 if intro_image is not None:
                     logger.info("AI intro image ready")
             except Exception as e:
                 logger.warning(f"AI intro image generation skipped: {e}")
+            
+            # If AI image gen failed, use the most striking panel as fallback
+            # (Gemini picks intro_panel_index — much better than blurry panel[0])
+            if intro_image is None:
+                intro_panel_idx = story_output.metadata.get('intro_panel_index')
+                if intro_panel_idx is not None:
+                    # Find this panel in selected_panels
+                    for p in selected_panels:
+                        if p.index == intro_panel_idx:
+                            intro_image = p.image.copy()
+                            logger.info(f"Using Gemini-selected panel {intro_panel_idx} as intro background")
+                            break
             
             # Stage 6: Duration Planning
             self._logger.start_stage("Duration Planning")

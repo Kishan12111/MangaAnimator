@@ -293,11 +293,12 @@ and the manga's known lore. Never fall back to generic filler.
 OUTPUT FORMAT (STRICT JSON, no markdown, no explanation):
 {{
     "narration_script": "the narration text here...",
-    "intro_hook": "A single atmospheric sentence (8-15 words) tied to THIS chapter's specific events. NOT generic. It appears on a dark title card before the video. Must reference something from the actual story shown in these panels. Examples: 'Garou stands before the S-Class. And he's smiling.' or 'Saitama made a promise. One he can't keep.' BAD examples (too generic): 'The battle begins.' or 'Everything is about to change.'",
+    "intro_hook": "A short provocative sentence (8-20 words) designed to STOP someone from scrolling. Must reference a SPECIFIC character or event from THIS chapter. Frame it as a question, a bold claim, or an unresolved tension. Examples: 'Garou stands before the entire S-Class. Alone. And he's smiling.' | 'She gave up everything. And it still wasn't enough.' | 'They told him he was the weakest. They were wrong.' BAD examples (too generic): 'The battle begins.' | 'Everything is about to change.' | 'Chapter 120.' The hook must sound like something a real person would say to get your attention.",
+    "intro_panel_index": "(integer) the index of the single most visually STRIKING panel — a dramatic close-up, a powerful pose, a beautiful character shot, or a jaw-dropping action frame. This panel will be shown as the intro background image. Pick the one that would make someone STOP scrolling. Prefer panels showing a character's face, a dramatic pose, or an emotional moment.",
     "key_events": ["brief description of each major plot beat — be specific, use names and actions"],
     "selected_panel_indices": [panel indices from {selected_indices}],
     "tone": "one of: dramatic | hype | emotional | intense | somber | comedic | suspenseful | triumphant",
-    "characters": [{{"name": "character name", "features": "distinctive features"}}]
+    "characters": [{{"name": "character name", "gender": "male | female | unknown", "features": "hair color/style, outfit, distinctive visual features", "role": "protagonist | antagonist | supporting"}}]
 }}
 
 IMPORTANT: ONLY output valid JSON. No explanations, no markdown fences.
@@ -334,6 +335,7 @@ Generic narration = failure."""
         key_events = result.get("key_events", [])
         characters_raw = result.get("characters", [])
         intro_hook = result.get("intro_hook", "")
+        intro_panel_index = result.get("intro_panel_index", None)
         
         # Normalize characters to string list
         characters = []
@@ -344,6 +346,13 @@ Generic narration = failure."""
                 character_details.append(c)
             else:
                 characters.append(str(c))
+        
+        # Try to convert intro_panel_index to int
+        if intro_panel_index is not None:
+            try:
+                intro_panel_index = int(intro_panel_index)
+            except (ValueError, TypeError):
+                intro_panel_index = None
         
         script = self.adjust_for_duration(script, input_data.max_duration_seconds)
         word_count = len(script.split())
@@ -361,7 +370,8 @@ Generic narration = failure."""
             metadata={
                 'model': self._model_name,
                 'analysis_type': 'vision',
-                'character_details': character_details
+                'character_details': character_details,
+                'intro_panel_index': intro_panel_index,
             }
         )
     
@@ -836,18 +846,26 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
         tone: str = "dramatic",
         characters: Optional[List[str]] = None,
         manga_title: str = "",
+        character_details: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[np.ndarray]:
         """Generate an AI intro image using Gemini's image generation.
 
-        Creates a coloured, atmospheric anime-style illustration that
-        captures the mood and context of the chapter — used as the
-        title-card background instead of a blurred manga panel.
+        Creates a character-focused, coloured anime illustration designed to
+        STOP SCROLLING — used as the title-card background.
+
+        Strategy:
+        1. If female characters exist → generate an attractive, eye-catching
+           portrait of the most prominent one in a dramatic/beautiful pose.
+        2. Otherwise → generate a powerful character shot of the protagonist
+           or the most dramatic moment.
+        3. Always character-focused, never a generic landscape.
 
         Args:
             summary: Story summary / narration script
             tone: Detected narrative tone
             characters: Character names mentioned in this chapter
             manga_title: Title of the manga
+            character_details: List of dicts with name/gender/features/role
 
         Returns:
             BGR numpy array (portrait) or None on failure.
@@ -856,33 +874,74 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
             logger.info("Gemini client unavailable — skipping AI intro image")
             return None
 
-        # Build a concise scene-description prompt from the story context
-        char_line = ""
-        if characters:
-            names = ", ".join(characters[:4])
-            char_line = f"Characters present: {names}. "
+        # ── Pick the focal character for the intro image ──
+        focal_char = None
+        focal_desc = ""
+        char_details = character_details or []
 
-        # Take the first ~120 words of the summary for context
-        summary_short = " ".join(summary.split()[:120])
+        # Priority 1: Female characters (eye-catching for engagement)
+        female_chars = [c for c in char_details if c.get("gender", "").lower() == "female"]
+        if female_chars:
+            focal_char = female_chars[0]
+            features = focal_char.get("features", "beautiful anime girl")
+            name = focal_char.get("name", "the heroine")
+            focal_desc = (
+                f"Focus on {name}: {features}. "
+                f"She should be the clear subject of the image. "
+                f"Make her look stunning — beautiful face, detailed eyes, "
+                f"expressive pose (confident / fierce / elegant / mysterious, "
+                f"whichever fits the tone: {tone}). "
+                f"Draw her in a way that makes people stop scrolling."
+            )
+            logger.info(f"Intro image focal character (female): {name}")
+
+        # Priority 2: Protagonist or first character
+        if not focal_char and char_details:
+            # Try protagonist first
+            protag = [c for c in char_details if c.get("role", "").lower() == "protagonist"]
+            focal_char = protag[0] if protag else char_details[0]
+            features = focal_char.get("features", "anime character")
+            name = focal_char.get("name", "the main character")
+            focal_desc = (
+                f"Focus on {name}: {features}. "
+                f"Show them in a powerful, dramatic pose that conveys {tone} energy. "
+                f"Make the character look badass / cool / intimidating as appropriate."
+            )
+            logger.info(f"Intro image focal character: {name}")
+
+        # Priority 3: Just use character names if no details
+        if not focal_char and characters:
+            name = characters[0]
+            focal_desc = (
+                f"Focus on {name} from {manga_title or 'this anime'}. "
+                f"Show them in a visually striking pose."
+            )
+
+        # Take the first ~80 words of the summary for scene context
+        summary_short = " ".join(summary.split()[:80])
 
         prompt = (
-            f"Generate a single high-quality anime illustration that captures "
-            f"the mood and atmosphere of the following manga scene. "
-            f"Title: \"{manga_title}\". Tone: {tone}. {char_line}"
-            f"Scene context: {summary_short}\n\n"
-            f"Requirements:\n"
-            f"- Vivid colours, dramatic lighting, cinematic composition\n"
-            f"- Portrait orientation (taller than wide)\n"
-            f"- Atmospheric background scene — NO speech bubbles, NO text\n"
-            f"- Anime / manga art style\n"
-            f"- Should evoke the emotional tone of the scene\n"
-            f"- Do NOT include any words, labels, or watermarks in the image"
+            f"Generate a single HIGH-QUALITY anime character illustration. "
+            f"This is a thumbnail/intro image for a YouTube Shorts video about "
+            f"\"{manga_title or 'an anime series'}\".\n\n"
+            f"SUBJECT: {focal_desc}\n\n"
+            f"Scene mood: {tone}. Context: {summary_short}\n\n"
+            f"STRICT REQUIREMENTS:\n"
+            f"- CHARACTER must fill at least 60% of the frame (close-up or medium shot)\n"
+            f"- Beautiful anime art style, high detail on face and eyes\n"
+            f"- Vivid colours, dramatic/cinematic lighting\n"
+            f"- Portrait orientation (9:16 ratio, taller than wide)\n"
+            f"- Atmospheric background that matches the mood (blurred/bokeh OK)\n"
+            f"- NO text, NO speech bubbles, NO watermarks, NO UI elements\n"
+            f"- The image should make someone STOP scrolling — visually stunning\n"
+            f"- Professional anime illustration quality (studio level)"
         )
 
         # Try multiple models in order of preference
         image_models = [
             "gemini-2.0-flash-exp-image-generation",
-            "gemini-2.5-flash-image",
+            "gemini-2.0-flash-preview-image-generation",
+            "imagen-3.0-generate-002",
         ]
 
         from google.genai import types as genai_types
@@ -919,6 +978,8 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
                 err_str = str(e)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                     logger.info(f"{model_name}: quota exhausted, trying next")
+                elif "not found" in err_str.lower() or "404" in err_str:
+                    logger.info(f"{model_name}: model not available, trying next")
                 else:
                     logger.warning(f"{model_name} failed: {err_str[:200]}")
 

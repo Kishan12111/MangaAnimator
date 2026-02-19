@@ -1114,8 +1114,14 @@ class VideoGenerator(BaseVideoGenerator):
         # Resize first panel to cover the frame
         bg = self.resize_for_format(first_panel, w, h, "cover")
 
-        # Heavy Gaussian blur for atmospheric background
-        bg = cv2.GaussianBlur(bg, (0, 0), sigmaX=25, sigmaY=25)
+        # Enhance the panel: boost saturation and contrast for visual impact
+        hsv = cv2.cvtColor(bg, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.4, 0, 255)  # Boost saturation
+        hsv[:, :, 2] = np.clip(hsv[:, :, 2] * 1.1, 0, 255)  # Slight brightness
+        bg = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+        # Medium blur — atmospheric but not so heavy it kills the art
+        bg = cv2.GaussianBlur(bg, (0, 0), sigmaX=15, sigmaY=15)
 
         # Dark semi-transparent overlay (gradient: darker at center for text contrast)
         overlay = np.zeros((h, w, 3), dtype=np.uint8)
