@@ -321,6 +321,15 @@ class MangaVideoPipeline:
                             intro_image = p.image.copy()
                             logger.info(f"Using Gemini-selected panel {intro_panel_idx} as intro background")
                             break
+
+            # Last resort: pick the largest / most detailed panel heuristically
+            if intro_image is None and selected_panels:
+                best_panel = max(
+                    selected_panels,
+                    key=lambda p: p.image.shape[0] * p.image.shape[1],  # largest area = most detail
+                )
+                intro_image = best_panel.image.copy()
+                logger.info(f"Using largest panel (idx {best_panel.index}) as intro background (heuristic fallback)")
             
             # Stage 6: Duration Planning
             self._logger.start_stage("Duration Planning")

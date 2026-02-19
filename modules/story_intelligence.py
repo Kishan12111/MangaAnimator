@@ -616,7 +616,12 @@ ONLY output valid JSON, no explanations."""
             characters=[],
             estimated_duration=min(estimated_duration, input_data.max_duration_seconds),
             confidence=0.3,
-            metadata={'model': 'placeholder', 'note': 'No LLM available'}
+            intro_hook=f"You won't believe what happens next in {self._anime_title or 'this manga'}...",
+            metadata={
+                'model': 'placeholder',
+                'note': 'No LLM available',
+                'intro_panel_index': input_data.panel_indices[0] if input_data.panel_indices else None,
+            }
         )
     
     def _generate_generic_narration(
