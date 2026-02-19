@@ -884,25 +884,27 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
         focal_desc = ""
         char_details = character_details or []
 
-        # Priority 1: Female characters (eye-catching for engagement)
+        # Priority 1: Female characters (eye-catching thumbnail for engagement)
         female_chars = [c for c in char_details if c.get("gender", "").lower() == "female"]
         if female_chars:
             focal_char = female_chars[0]
-            features = focal_char.get("features", "beautiful anime girl")
+            features = focal_char.get("features", "beautiful anime girl with large expressive eyes")
             name = focal_char.get("name", "the heroine")
             focal_desc = (
-                f"Focus on {name}: {features}. "
-                f"She should be the clear subject of the image. "
-                f"Make her look stunning — beautiful face, detailed eyes, "
-                f"expressive pose (confident / fierce / elegant / mysterious, "
-                f"whichever fits the tone: {tone}). "
-                f"Draw her in a way that makes people stop scrolling."
+                f"A gorgeous anime girl — {name}: {features}. "
+                f"She is the ONLY subject of the image. "
+                f"MANDATORY: extremely beautiful face, big sparkling detailed anime eyes, "
+                f"glossy lips, perfect skin, flowing hair with highlights. "
+                f"Attractive body proportions, form-fitting outfit that shows her figure. "
+                f"Pose: confident / alluring / fierce / elegant — whichever fits '{tone}' mood. "
+                f"Expression: captivating, looking at the viewer or in a dramatic angle. "
+                f"This image MUST make male viewers aged 16-30 stop scrolling instantly. "
+                f"Think: top-tier waifu fan art, Pixiv top-ranked illustration quality."
             )
             logger.info(f"Intro image focal character (female): {name}")
 
         # Priority 2: Protagonist or first character
         if not focal_char and char_details:
-            # Try protagonist first
             protag = [c for c in char_details if c.get("role", "").lower() == "protagonist"]
             focal_char = protag[0] if protag else char_details[0]
             features = focal_char.get("features", "anime character")
@@ -910,7 +912,8 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
             focal_desc = (
                 f"Focus on {name}: {features}. "
                 f"Show them in a powerful, dramatic pose that conveys {tone} energy. "
-                f"Make the character look badass / cool / intimidating as appropriate."
+                f"Make the character look badass / cool / intimidating as appropriate. "
+                f"High detail on face, eyes, and outfit."
             )
             logger.info(f"Intro image focal character: {name}")
 
@@ -919,7 +922,16 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
             name = characters[0]
             focal_desc = (
                 f"Focus on {name} from {manga_title or 'this anime'}. "
-                f"Show them in a visually striking pose."
+                f"Show them in a visually striking, dramatic pose. "
+                f"If the character is female, make her look beautiful and captivating."
+            )
+
+        # Priority 4: No character info at all — generic attractive anime character
+        if not focal_desc:
+            focal_desc = (
+                f"A beautiful anime character from {manga_title or 'a manga series'}. "
+                f"Preferably a gorgeous anime girl with detailed eyes and flowing hair. "
+                f"Dramatic pose, captivating expression."
             )
 
         # Take the first ~80 words of the summary for scene context
@@ -927,66 +939,75 @@ Respond with ONLY one of: dramatic, comedic, action, romantic, mysterious, horro
 
         prompt = (
             f"Generate a single HIGH-QUALITY anime character illustration. "
-            f"This is a thumbnail/intro image for a YouTube Shorts video about "
-            f"\"{manga_title or 'an anime series'}\".\n\n"
+            f"This is a YouTube Shorts thumbnail that MUST grab attention instantly.\n\n"
             f"SUBJECT: {focal_desc}\n\n"
             f"Scene mood: {tone}. Context: {summary_short}\n\n"
             f"STRICT REQUIREMENTS:\n"
-            f"- CHARACTER must fill at least 60% of the frame (close-up or medium shot)\n"
-            f"- Beautiful anime art style, high detail on face and eyes\n"
-            f"- Vivid colours, dramatic/cinematic lighting\n"
+            f"- CHARACTER must fill at least 70% of the frame (close-up or medium shot)\n"
+            f"- Stunning anime art style — top-tier quality like Ufotable / Wit Studio\n"
+            f"- Extremely detailed face and eyes (the most important part)\n"
+            f"- Vivid, saturated colours with dramatic cinematic lighting\n"
             f"- Portrait orientation (9:16 ratio, taller than wide)\n"
-            f"- Atmospheric background that matches the mood (blurred/bokeh OK)\n"
-            f"- NO text, NO speech bubbles, NO watermarks, NO UI elements\n"
-            f"- The image should make someone STOP scrolling — visually stunning\n"
-            f"- Professional anime illustration quality (studio level)"
+            f"- Soft atmospheric background (blurred/bokeh/particle effects OK)\n"
+            f"- NO text, NO speech bubbles, NO watermarks, NO logos, NO UI elements\n"
+            f"- The image should be so beautiful it makes someone STOP scrolling\n"
+            f"- Professional illustration quality — could be a poster or figure box art"
         )
 
-        # Try multiple models in order of preference
+        # Try multiple models in order of preference (updated Feb 2026)
         image_models = [
+            "gemini-2.5-flash-image",
             "gemini-2.0-flash-exp-image-generation",
-            "gemini-2.0-flash-preview-image-generation",
-            "imagen-3.0-generate-002",
+            "gemini-3-pro-image-preview",
         ]
 
         from google.genai import types as genai_types
+        import time
 
         for model_name in image_models:
-            try:
-                logger.info(f"Attempting intro image with {model_name}")
-                response = self._client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=genai_types.GenerateContentConfig(
-                        response_modalities=["IMAGE", "TEXT"],
-                        temperature=1.0,
-                    ),
-                )
+            # Retry up to 2 times per model on rate-limit (429 resets quickly)
+            for attempt in range(2):
+                try:
+                    logger.info(f"Attempting intro image with {model_name} (attempt {attempt + 1})")
+                    response = self._client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            response_modalities=["IMAGE", "TEXT"],
+                            temperature=1.0,
+                        ),
+                    )
 
-                # Extract image bytes from the response
-                if response.candidates:
-                    for part in response.candidates[0].content.parts:
-                        if part.inline_data and part.inline_data.data:
-                            img_bytes = part.inline_data.data
-                            img_array = np.frombuffer(img_bytes, dtype=np.uint8)
-                            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-                            if img is not None:
-                                logger.info(
-                                    f"AI intro image generated via {model_name}: "
-                                    f"{img.shape[1]}x{img.shape[0]}"
-                                )
-                                return img
+                    # Extract image bytes from the response
+                    if response.candidates:
+                        for part in response.candidates[0].content.parts:
+                            if part.inline_data and part.inline_data.data:
+                                img_bytes = part.inline_data.data
+                                img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+                                img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                                if img is not None:
+                                    logger.info(
+                                        f"AI intro image generated via {model_name}: "
+                                        f"{img.shape[1]}x{img.shape[0]}"
+                                    )
+                                    return img
 
-                logger.info(f"{model_name}: no image in response, trying next")
+                    logger.info(f"{model_name}: no image in response, trying next model")
+                    break  # No retry needed — model responded but without image
 
-            except Exception as e:
-                err_str = str(e)
-                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                    logger.info(f"{model_name}: quota exhausted, trying next")
-                elif "not found" in err_str.lower() or "404" in err_str:
-                    logger.info(f"{model_name}: model not available, trying next")
-                else:
-                    logger.warning(f"{model_name} failed: {err_str[:200]}")
+                except Exception as e:
+                    err_str = str(e)
+                    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                        if attempt == 0:
+                            logger.info(f"{model_name}: rate limited, waiting 10s before retry...")
+                            time.sleep(10)
+                            continue  # retry same model
+                        logger.info(f"{model_name}: still rate limited after retry, trying next model")
+                    elif "not found" in err_str.lower() or "404" in err_str:
+                        logger.info(f"{model_name}: model not available, trying next")
+                    else:
+                        logger.warning(f"{model_name} failed: {err_str[:200]}")
+                    break  # move to next model
 
         logger.warning("All image generation models exhausted — using fallback intro")
         return None

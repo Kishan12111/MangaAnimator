@@ -89,8 +89,8 @@ class VideoGenerator(BaseVideoGenerator):
         
         logger.info(f"Generating video with {len(panels)} panels")
         
-        # Intro card duration (seconds) — only if we have a hook
-        intro_duration = 2.5 if intro_hook else 0.0
+        # Intro card duration (seconds) — show if we have a hook OR an AI image
+        intro_duration = 3.5 if (intro_hook or intro_image is not None) else 0.0
         
         # Determine audio duration
         if audio_path and audio_path.exists():
@@ -968,7 +968,7 @@ class VideoGenerator(BaseVideoGenerator):
         frame_idx = 0
         
         # ── Intro card: atmospheric blurred panel + title + hook text ──
-        if intro_duration > 0 and intro_hook and len(panels) > 0:
+        if intro_duration > 0 and (intro_hook or intro_image is not None) and len(panels) > 0:
             intro_frames_count = int(intro_duration * config.fps)
             intro_card = self._render_intro_card(
                 panels[0], config, intro_hook, manga_title,
@@ -1078,14 +1078,12 @@ class VideoGenerator(BaseVideoGenerator):
             # Light bottom-gradient so the title text is readable
             gradient = np.zeros((h, w, 3), dtype=np.uint8)
             for y in range(h):
-                # Subtle gradient: transparent at top, darker at bottom 30 %
                 frac = y / h
                 if frac > 0.65:
-                    darkness = int(((frac - 0.65) / 0.35) * 160)
+                    darkness = int(((frac - 0.65) / 0.35) * 180)
                     gradient[y, :] = darkness
-                # Also slight darkening at the very top for title
                 elif frac < 0.18:
-                    darkness = int(((0.18 - frac) / 0.18) * 90)
+                    darkness = int(((0.18 - frac) / 0.18) * 100)
                     gradient[y, :] = darkness
             bg = cv2.subtract(bg, gradient)
 
@@ -1093,7 +1091,7 @@ class VideoGenerator(BaseVideoGenerator):
             vignette = self._get_vignette_mask(w, h)
             bg = cv2.multiply(bg, vignette, scale=1.0 / 255.0, dtype=cv2.CV_8U)
 
-            # ── Minimal title overlay ──
+            # ── Title at top ──
             if manga_title:
                 title_text = manga_title.split('\n')[0].strip()[:40]
                 if title_text:
@@ -1108,6 +1106,29 @@ class VideoGenerator(BaseVideoGenerator):
                                 (0, 0, 0), title_thickness + 2, cv2.LINE_AA)
                     cv2.putText(bg, title_text, (tx, ty), title_font, title_scale,
                                 (255, 255, 255), title_thickness, cv2.LINE_AA)
+
+            # ── Hook text at bottom (on top of the AI image) ──
+            if intro_hook:
+                hook_font = cv2.FONT_HERSHEY_SIMPLEX
+                hook_scale = min(w / 550, 1.3)
+                hook_thickness = max(int(hook_scale * 1.5), 1)
+                max_text_width = int(w * 0.85)
+                hook_lines = self._wrap_text_cv2(intro_hook, hook_font, hook_scale, hook_thickness, max_text_width)
+
+                # Position at bottom 20% of frame (over the gradient)
+                start_y = int(h * 0.80)
+                line_gap = int(42 * hook_scale)
+
+                for i, line in enumerate(hook_lines):
+                    (lw, lh), _ = cv2.getTextSize(line, hook_font, hook_scale, hook_thickness)
+                    lx = (w - lw) // 2
+                    ly = start_y + i * line_gap
+                    # Strong shadow for readability over image
+                    cv2.putText(bg, line, (lx + 2, ly + 2), hook_font, hook_scale,
+                                (0, 0, 0), hook_thickness + 3, cv2.LINE_AA)
+                    # Bright golden yellow text
+                    cv2.putText(bg, line, (lx, ly), hook_font, hook_scale,
+                                (0, 220, 255), hook_thickness, cv2.LINE_AA)
 
             return bg
 
