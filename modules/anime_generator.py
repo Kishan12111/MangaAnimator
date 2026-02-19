@@ -456,6 +456,115 @@ class AnimeGenerator(BaseAnimeGenerator):
         except Exception:
             pass
 
+    # ────────────────── Text-to-Image (Intro Thumbnail) ──────────────────
+
+    def generate_intro_thumbnail(
+        self,
+        prompt: str,
+        negative_prompt: str = "",
+        width: int = 512,
+        height: int = 768,
+        steps: int = 30,
+        guidance_scale: float = 8.0,
+        seed: int = -1,
+    ) -> Optional[np.ndarray]:
+        """Generate an anime image from text using SD 1.5 txt2img.
+
+        Used for intro thumbnail / title-card background.
+        Loads a txt2img pipeline (shares the same model weights as img2img),
+        generates the image, then unloads to free VRAM.
+
+        Args:
+            prompt: Text prompt describing the image.
+            negative_prompt: Things to avoid.
+            width: Image width (multiple of 8, default 512 for portrait).
+            height: Image height (multiple of 8, default 768 for portrait).
+            steps: Diffusion steps (more = better quality, slower).
+            guidance_scale: CFG scale — how closely to follow prompt.
+            seed: Random seed (-1 = random).
+
+        Returns:
+            BGR numpy array or None on failure.
+        """
+        import torch
+
+        device = _select_device("auto")
+        if device == "cpu":
+            logger.warning("No CUDA GPU — skipping SD txt2img for intro thumbnail")
+            return None
+
+        model_id = "stablediffusionapi/anything-v5"
+        dtype = torch.float16
+
+        if not negative_prompt:
+            negative_prompt = (
+                "blurry, low quality, worst quality, jpeg artifacts, watermark, "
+                "text, speech bubble, dialogue, deformed, ugly, duplicate, "
+                "extra fingers, mutated hands, poorly drawn hands, poorly drawn face, "
+                "mutation, extra limbs, bad anatomy, bad proportions, disfigured, "
+                "nsfw, nude, naked, explicit, grotesque, gore"
+            )
+
+        if seed < 0:
+            seed = random.randint(0, 2**32 - 1)
+
+        txt2img_pipe = None
+        try:
+            from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+
+            logger.info(f"Loading SD txt2img pipeline: {model_id}")
+            txt2img_pipe = StableDiffusionPipeline.from_pretrained(
+                model_id,
+                torch_dtype=dtype,
+                safety_checker=None,
+                requires_safety_checker=False,
+                cache_dir=str(_HF_CACHE / "hub"),
+            )
+            txt2img_pipe.to(device)
+            txt2img_pipe.enable_attention_slicing()
+            if hasattr(txt2img_pipe, "enable_vae_tiling"):
+                txt2img_pipe.enable_vae_tiling()
+
+            # Use DPM++ 2M Karras scheduler for better quality
+            txt2img_pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                txt2img_pipe.scheduler.config,
+                algorithm_type="dpmsolver++",
+                use_karras_sigmas=True,
+            )
+
+            generator = torch.Generator(device=device).manual_seed(seed)
+
+            logger.info(f"Generating intro thumbnail: {width}x{height}, {steps} steps, seed={seed}")
+            result = txt2img_pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                width=width,
+                height=height,
+                num_inference_steps=steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            ).images[0]
+
+            # Convert PIL → numpy BGR
+            result_np = np.array(result)
+            if result_np.ndim == 3 and result_np.shape[2] == 3:
+                result_np = cv2.cvtColor(result_np, cv2.COLOR_RGB2BGR)
+
+            logger.info(f"✓ Intro thumbnail generated: {result_np.shape[1]}x{result_np.shape[0]}")
+            return result_np
+
+        except Exception as e:
+            logger.error(f"SD txt2img failed: {e}")
+            return None
+
+        finally:
+            # Always free VRAM
+            if txt2img_pipe is not None:
+                del txt2img_pipe
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
     # ────────────────── Image Processing ──────────────────
 
     @staticmethod

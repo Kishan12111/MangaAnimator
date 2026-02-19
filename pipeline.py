@@ -294,39 +294,64 @@ class MangaVideoPipeline:
             logger.info(f"Generated script with {len(story_output.summary_script.split())} words")
             
             # Generate AI intro image (non-blocking — falls back to best panel)
+            # Priority: 1) SD txt2img (local, fast, no rate limits)
+            #           2) Gemini image gen (cloud, may hit quota)
+            #           3) Gemini-selected best panel
+            #           4) Largest panel heuristic
             intro_image = None
+            char_details = story_output.metadata.get('character_details', [])
+            manga_title_str = getattr(self.config, 'anime_title', '') or title
+
+            # ── Try SD txt2img first (local GPU) ──
             try:
-                # Pass character_details so intro image can prioritize characters
-                char_details = story_output.metadata.get('character_details', [])
-                intro_image = self.story_intelligence.generate_intro_image(
-                    summary=story_output.summary_script,
-                    tone=story_output.tone,
-                    characters=story_output.characters,
-                    manga_title=getattr(self.config, 'anime_title', '') or title,
-                    character_details=char_details,
+                from modules.anime_generator import AnimeGenerator as _AG
+                sd_gen = _AG()
+                sd_prompt = self._build_sd_intro_prompt(
+                    char_details, story_output.characters,
+                    story_output.tone, manga_title_str,
+                )
+                intro_image = sd_gen.generate_intro_thumbnail(
+                    prompt=sd_prompt,
+                    width=512,
+                    height=768,
+                    steps=30,
+                    guidance_scale=8.0,
                 )
                 if intro_image is not None:
-                    logger.info("AI intro image ready")
+                    logger.info("SD txt2img intro image ready")
             except Exception as e:
-                logger.warning(f"AI intro image generation skipped: {e}")
+                logger.warning(f"SD txt2img intro skipped: {e}")
+
+            # ── Fallback: Gemini image gen ──
+            if intro_image is None:
+                try:
+                    intro_image = self.story_intelligence.generate_intro_image(
+                        summary=story_output.summary_script,
+                        tone=story_output.tone,
+                        characters=story_output.characters,
+                        manga_title=manga_title_str,
+                        character_details=char_details,
+                    )
+                    if intro_image is not None:
+                        logger.info("Gemini AI intro image ready")
+                except Exception as e:
+                    logger.warning(f"Gemini intro image skipped: {e}")
             
-            # If AI image gen failed, use the most striking panel as fallback
-            # (Gemini picks intro_panel_index — much better than blurry panel[0])
+            # ── Fallback: Gemini-selected best panel ──
             if intro_image is None:
                 intro_panel_idx = story_output.metadata.get('intro_panel_index')
                 if intro_panel_idx is not None:
-                    # Find this panel in selected_panels
                     for p in selected_panels:
                         if p.index == intro_panel_idx:
                             intro_image = p.image.copy()
                             logger.info(f"Using Gemini-selected panel {intro_panel_idx} as intro background")
                             break
 
-            # Last resort: pick the largest / most detailed panel heuristically
+            # ── Last resort: largest panel ──
             if intro_image is None and selected_panels:
                 best_panel = max(
                     selected_panels,
-                    key=lambda p: p.image.shape[0] * p.image.shape[1],  # largest area = most detail
+                    key=lambda p: p.image.shape[0] * p.image.shape[1],
                 )
                 intro_image = best_panel.image.copy()
                 logger.info(f"Using largest panel (idx {best_panel.index}) as intro background (heuristic fallback)")
@@ -561,6 +586,80 @@ class MangaVideoPipeline:
     def _get_elapsed(self, start_time: datetime) -> float:
         """Get elapsed time since start."""
         return (datetime.now() - start_time).total_seconds()
+
+    @staticmethod
+    def _build_sd_intro_prompt(
+        char_details: list,
+        characters: list,
+        tone: str,
+        manga_title: str,
+    ) -> str:
+        """Build a Stable Diffusion txt2img prompt for the intro thumbnail.
+
+        Prioritises female characters for eye-catching thumbnails.
+        Uses SD1.5-optimised tag-style prompting (not natural language).
+        """
+        # Quality tags that work well with Anything V5
+        quality = (
+            "masterpiece, best quality, extremely detailed, "
+            "beautiful detailed eyes, detailed face, "
+            "anime style, vivid colors, dramatic lighting, "
+            "cinematic composition, portrait, upper body"
+        )
+
+        focal_tags = ""
+
+        # Priority 1: Female character with details
+        female_chars = [c for c in char_details if c.get("gender", "").lower() == "female"]
+        if female_chars:
+            c = female_chars[0]
+            features = c.get("features", "")
+            name = c.get("name", "anime girl")
+            focal_tags = (
+                f"1girl, solo, {name}, beautiful anime girl, "
+                f"gorgeous face, sparkling detailed eyes, glossy lips, "
+                f"flowing hair, attractive, alluring pose, "
+                f"form-fitting outfit, {features}, "
+                f"looking at viewer, captivating expression"
+            )
+        # Priority 2: Male protagonist
+        elif char_details:
+            protag = [c for c in char_details if c.get("role", "").lower() == "protagonist"]
+            c = protag[0] if protag else char_details[0]
+            features = c.get("features", "")
+            name = c.get("name", "anime character")
+            gender = c.get("gender", "").lower()
+            tag = "1boy" if gender == "male" else "1girl"
+            focal_tags = (
+                f"{tag}, solo, {name}, {features}, "
+                f"powerful pose, dramatic expression, "
+                f"cool, badass, intense eyes"
+            )
+        # Priority 3: Character name only
+        elif characters:
+            focal_tags = f"1girl, solo, {characters[0]}, beautiful anime girl, detailed eyes"
+        # Priority 4: Generic attractive anime girl
+        else:
+            focal_tags = (
+                "1girl, solo, beautiful anime girl, long hair, "
+                "gorgeous face, detailed eyes, alluring, "
+                "looking at viewer, captivating"
+            )
+
+        # Tone-specific atmosphere tags
+        tone_tags = {
+            "dramatic": "dramatic lighting, intense atmosphere, dark background",
+            "hype": "dynamic angle, energy particles, glowing effects, epic",
+            "emotional": "soft lighting, emotional, gentle atmosphere, bokeh",
+            "intense": "battle aura, intense expression, action pose, particles",
+            "somber": "melancholic, rain, muted warm tones, reflective",
+            "comedic": "cheerful, bright colors, playful expression, sparkles",
+            "suspenseful": "mysterious, shadows, tension, dark atmosphere",
+            "triumphant": "golden light, victorious, shining, heroic pose",
+        }.get(tone, "dramatic lighting, atmospheric")
+
+        prompt = f"{quality}, {focal_tags}, {tone_tags}"
+        return prompt
 
     def _generate_anime_clip(
         self,
