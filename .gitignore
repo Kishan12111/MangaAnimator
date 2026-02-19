@@ -64,6 +64,7 @@ models/
 *.key
 secrets.json
 client_secrets.json
+config.json
 
 # Test outputs
 test_outputs/
