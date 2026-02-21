@@ -1,0 +1,9 @@
+runtime:
+  profile: colab_gpu
+  device: cuda
+  mixed_precision: fp16
+  batch_size: 4
+
+execution:
+  resume: true
+  debug: false

@@ -1,0 +1,28 @@
+panel_understanding:
+  vlm_primary: microsoft/Florence-2-large
+  vlm_fallback: Qwen/Qwen2-VL-7B-Instruct
+  ocr_primary: manga-ocr
+  ocr_fallback: paddleocr
+
+character_extraction:
+  segmentation_primary: facebook/sam2-hiera-large
+  segmentation_fallback: sam-hq
+  pose_primary: dwpose
+  pose_fallback: openpose
+
+rigging:
+  skinning_solver: geodesic_distance_weighting
+  constraints: [ik, angle_limits, foot_lock]
+
+animation:
+  mode_primary: procedural
+  mode_alt: [template, pose_transfer]
+
+background:
+  depth_primary: depth-anything/Depth-Anything-V2-Large
+  inpaint_primary: stabilityai/stable-diffusion-2-inpainting
+
+renderer:
+  compositor: pillow_high_quality
+  encoder_primary: ffmpeg_h264
+  encoder_fallback: gif

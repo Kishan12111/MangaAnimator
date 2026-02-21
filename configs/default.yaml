@@ -1,0 +1,30 @@
+runtime:
+  profile: auto
+  device: auto
+  mixed_precision: auto
+  batch_size: auto
+
+quality:
+  profile: max_quality
+  target_fps: 24
+  shot_duration_sec: 3.0
+  layer_canvas: [1536, 1536]
+  part_scale: 1.0
+  camera_motion_amplitude: 0.14
+  default_motion_mode: procedural
+
+paths:
+  workspace: outputs
+  checkpoints: outputs/checkpoints
+  logs: outputs/logs
+  debug: outputs/debug
+
+execution:
+  resume: true
+  debug: false
+  num_workers: 2
+
+memory:
+  max_vram_gb: auto
+  cpu_offload: true
+  tile_size: 1024
