@@ -30,6 +30,7 @@ class AnimationMode(Enum):
     KEN_BURNS = "ken_burns"     # Pan/zoom animation on static frames
     INTERPOLATED = "interpolated"  # AI frame interpolation between panels
     ANIMATED = "animated"       # Full AnimateDiff motion generation
+    PUPPET = "puppet"           # Industry-style puppet control (segment/rig/pose/lipsync)
 
 
 @dataclass

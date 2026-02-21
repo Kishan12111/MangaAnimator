@@ -88,6 +88,7 @@ class Config:
     # Anime generation settings
     enable_anime_gen: bool = False
     anime_style: str = "modern_anime"
+    anime_animation_mode: str = "ken_burns"
     anime_strength: float = 0.65
     anime_steps: int = 25
     anime_controlnet: bool = True
@@ -111,6 +112,7 @@ class Config:
             'openai_api_key', 'gemini_api_key', 'elevenlabs_api_key',
             'anime_title', 'character_colors', 'auto_upload',
             'upload_platform', 'enable_anime_gen', 'anime_style',
+            'anime_animation_mode',
             'anime_strength', 'anime_steps', 'anime_controlnet',
             'anime_fps', 'narrator_voice',
         }
@@ -157,6 +159,13 @@ class Config:
             "auto_upload": self.auto_upload,
             "upload_platform": self.upload_platform,
             "anime_title": self.anime_title,
+            "enable_anime_gen": self.enable_anime_gen,
+            "anime_style": self.anime_style,
+            "anime_animation_mode": self.anime_animation_mode,
+            "anime_strength": self.anime_strength,
+            "anime_steps": self.anime_steps,
+            "anime_controlnet": self.anime_controlnet,
+            "anime_fps": self.anime_fps,
         }
 
         # Include any extra settings passed through from config

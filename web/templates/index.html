@@ -545,6 +545,16 @@
         </select>
       </div>
 
+      <div class="field" id="anime-motion-field" style="display:none;">
+        <label>Animation Mode</label>
+        <select id="anime-motion-select">
+          <option value="ken_burns" selected>Cinematic Ken Burns</option>
+          <option value="puppet">Puppet Animation (industry-style control)</option>
+          <option value="static">Static</option>
+          <option value="interpolated">Interpolated</option>
+        </select>
+      </div>
+
       <!-- TTS Engine -->
       <div class="field">
         <label>TTS Engine</label>
@@ -682,6 +692,7 @@
     // ── Engine Toggle ──────────────────────────────────────────────    // ── Anime Toggle ────────────────────────────────────────────────────
     document.getElementById('anime-toggle').addEventListener('change', function() {
       document.getElementById('anime-style-field').style.display = this.checked ? 'block' : 'none';
+      document.getElementById('anime-motion-field').style.display = this.checked ? 'block' : 'none';
     });
     engineBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -723,6 +734,7 @@
       fd.append('enable_colorization', document.getElementById('colorize-toggle').checked ? '1' : '0');
       fd.append('enable_anime_gen', document.getElementById('anime-toggle').checked ? '1' : '0');
       fd.append('anime_style', document.getElementById('anime-style-select').value);
+      fd.append('anime_animation_mode', document.getElementById('anime-motion-select').value);
 
       const customVoice = document.getElementById('custom-voice').value.trim();
       if (customVoice) {
