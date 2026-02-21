@@ -1,118 +1,83 @@
-# Production Implementation: Manga-to-Animation 2D Puppet Pipeline (Quality-First)
+# MangaAnimator Colab Production Guide (Single Source of Truth)
 
-## A. System Architecture Diagram
+This is the only explanation guide for running the project in Colab with high quality and controlled storage.
 
-```mermaid
-flowchart LR
-    I[Manga Panel Image(s)] --> P[Panel Understanding (VLM+OCR)]
-    P --> S[Scene JSON]
-    S --> C[Character Extraction (SAM2 + Pose)]
-    C --> R[Auto Rigging (IK + Weights)]
-    S --> F[Face + Lip Sync (Visemes + Emotion)]
-    I --> B[Background Engine (Depth + Parallax)]
-    R --> A[Animation Engine (Template / Pose-transfer / Procedural)]
-    F --> A
-    B --> V[Renderer (Cinematic Composite + Encode)]
-    A --> V
-    V --> O[24 FPS+ Output]
-```
+## 1) Recommended Colab setup
 
-## B. Complete File Structure
-
-```text
-src/
-  common/                  # checkpoints, stage runtime, model backends
-  panel_understanding/
-  character_extraction/
-  rigging/
-  face_lipsync/
-  background/
-  animation/
-  renderer/
-  orchestration/
-configs/
-scripts/
-tests/
-docs/
-```
-
-## C. Installation Script (with auto model downloads)
+1. Open Colab and select **GPU** runtime.
+2. Clone repo:
 
 ```bash
-# Optional for gated models
-export HF_TOKEN=your_huggingface_token
-
-# Automatic dependency + model setup
-DOWNLOAD_PROFILE=max_quality_50gb DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
+!git clone <YOUR_REPO_URL>
+%cd MangaAnimator
 ```
 
-Notes:
-- `scripts/install_colab.sh` now automatically downloads models listed in `configs/model_registry.yaml`.
-- Set `DOWNLOAD_MODELS=0` if you only want to install dependencies.
+3. (Optional) set HF token for gated models:
 
-## D. All Code Modules
+```python
+import os
+os.environ["HF_TOKEN"] = "hf_xxx"
+```
 
-- `src/common/stage.py`
-- `src/common/model_backends.py`
-- `src/panel_understanding/pipeline.py`
-- `src/character_extraction/pipeline.py`
-- `src/rigging/pipeline.py`
-- `src/animation/pipeline.py`
-- `src/face_lipsync/pipeline.py`
-- `src/background/pipeline.py`
-- `src/renderer/pipeline.py`
-- `src/orchestration/run_stage.py`
-- `src/orchestration/run_all.py`
-- `scripts/download_models.py`
-
-## E. Execution Pipeline
+4. Install dependencies and download models with a hard storage cap:
 
 ```bash
-python -m src.orchestration.run_all \
-  --input /path/to/panel.png \
-  --workdir outputs/full_pipeline \
-  --config configs/default.yaml \
-  --resume
+!DOWNLOAD_PROFILE=max_quality_50gb DOWNLOAD_MAX_TOTAL_GB=60 DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 DOWNLOAD_QUIET=1 bash scripts/install_colab.sh
 ```
 
-## F. Test Example
+## 2) Model names used by downloader
+
+- `Qwen/Qwen2-VL-7B-Instruct`
+- `llava-hf/llava-v1.6-vicuna-13b-hf` (only when profile/cap allows)
+- `facebook/sam2-hiera-large`
+- `LiheYoung/depth-anything-large-hf`
+- `stabilityai/stable-diffusion-2-inpainting`
+- `runwayml/stable-diffusion-v1-5`
+- `openai/whisper-large-v3`
+- `kha-white/manga-ocr-base`
+
+## 3) Storage control (important)
+
+The downloader enforces `--max-total-gb` (default `60`).
+If selected models exceed the cap, it automatically drops the largest models first and reports exactly which were removed.
+
+You can override:
 
 ```bash
-python -m unittest discover -s tests -p 'test_*.py'
+!DOWNLOAD_MAX_TOTAL_GB=55 bash scripts/install_colab.sh
 ```
 
-## G. Quality Optimization Tips
+## 4) Run pipeline and verify compute logs
 
-- Use `quality.profile=max_quality` and GPU runtime.
-- Keep `target_fps=24` with longer shots for smoother motion (`shot_duration_sec`).
-- Increase `layer_canvas` for cleaner puppet edges.
-- Keep ffmpeg available for MP4 export (GIF fallback is debug-oriented).
+```bash
+!python -m src.orchestration.run_all --input /content/panel.png --workdir outputs/full_pipeline --config configs/default.yaml --log-level INFO
+```
 
-## H. Failure Cases + Fixes
+Look for:
+- `Compute detected: device=cuda ...`
+- `Running stage ... used_vram=... free_vram=...`
+- `GPU warmup result: {'warmup': True ...}`
 
-- Missing heavyweight model libs/checkpoints in Colab: installer now attempts automatic download from registry; rerun install with `HF_TOKEN` for gated repos.
-- OOM at max-quality: lower batch/tile settings or switch to lower-quality runtime profile.
-- Weak OCR/dialogue alignment: ensure MangaOCR weights are installed and input resolution is high.
+## 5) Optional Flask + ngrok exposure
 
-## Powerful Open-Source Model Targets
+```bash
+!pip install -q pyngrok
+```
 
-Configured in `configs/model_registry.yaml` (quality-first references):
-- Florence-2 Large / Qwen2-VL 7B for scene understanding
-- SAM2-Hiera-Large for segmentation
-- DWPose/OpenPose for body guidance
-- Depth-Anything V2 Large for depth/parallax
-- SD 2 Inpainting for background completion
+```python
+import os, subprocess, time
+from pyngrok import ngrok
 
+os.environ["FLASK_HOST"] = "0.0.0.0"
+os.environ["FLASK_PORT"] = "5000"
 
+ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN")
+proc = subprocess.Popen(["python", "app.py"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+time.sleep(5)
+url = ngrok.connect(5000, "http")
+print(url)
+```
 
-## GPU/VRAM Utilization
+## 6) Output lag prevention in Colab
 
-- `run_all` now logs GPU device name and VRAM (used/free/total) at startup and per stage.
-- A CUDA warmup matrix multiply runs by default (`quality.force_gpu_warmup=true`) to ensure kernels are active.
-- Tune warmup size via `quality.gpu_warmup_matrix`.
-
-
-## Model Inventory and 50GB Budget
-
-- See `docs/model_inventory_and_storage.md` for exact model list and size estimates.
-- Default installer profile is now `max_quality_50gb` to fit Colab storage limits.
+Model downloader quiet mode is enabled by default via `DOWNLOAD_QUIET=1`, which disables noisy progress bars and keeps cells responsive.

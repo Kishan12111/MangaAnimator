@@ -46,7 +46,7 @@ python -m pip install -U onnxruntime-gpu phonemizer librosa
 echo "[7/8] Downloading heavyweight model weights (50GB-safe default profile)"
 # Controls:
 # - DOWNLOAD_MODELS=0 : skip downloads
-# - DOWNLOAD_PROFILE=light|max_quality
+# - DOWNLOAD_PROFILE=light|max_quality|max_quality_50gb
 # - DOWNLOAD_STRICT=1 : fail install if any model fails
 # - DOWNLOAD_REPOS=1 : also clone source repos in registry
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
@@ -63,11 +63,13 @@ if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
   if [[ "${DOWNLOAD_REPOS:-1}" == "1" ]]; then
     REPO_FLAG="--include-repos"
   fi
+  MAX_TOTAL_GB="${DOWNLOAD_MAX_TOTAL_GB:-60}"
   python scripts/download_models.py \
     --registry configs/model_registry.yaml \
     --models-dir models/checkpoints \
     --repos-dir models/repos \
     --profile "${PROFILE}" \
+    --max-total-gb "${MAX_TOTAL_GB}" \
     ${STRICT_FLAG} ${REPO_FLAG} ${QUIET_FLAG}
 else
   echo "[INFO] Skipping model downloads because DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0}"

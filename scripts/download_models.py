@@ -119,6 +119,16 @@ def _estimate_size(repo_ids: list[str]) -> float:
     return round(sum(MODEL_CATALOG.get(repo_id, 2.0) for repo_id in repo_ids), 2)
 
 
+def _cap_models_by_size(repo_ids: list[str], max_total_gb: float) -> tuple[list[str], list[str], float]:
+    selected = list(repo_ids)
+    dropped: list[str] = []
+    while _estimate_size(selected) > max_total_gb and selected:
+        largest = max(selected, key=lambda rid: MODEL_CATALOG.get(rid, 2.0))
+        selected.remove(largest)
+        dropped.append(largest)
+    return selected, dropped, _estimate_size(selected)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download model weights listed in configs/model_registry.yaml")
     parser.add_argument("--registry", default="configs/model_registry.yaml")
@@ -132,6 +142,7 @@ def main() -> int:
         help="Download profile",
     )
     parser.add_argument("--strict", action="store_true", help="Fail if any model download fails")
+    parser.add_argument("--max-total-gb", type=float, default=60.0, help="Hard storage cap for selected models")
     parser.add_argument("--quiet", action="store_true", help="Reduce per-model logs to avoid Colab output lag")
     args = parser.parse_args()
 
@@ -150,8 +161,13 @@ def main() -> int:
     profile_models = PROFILE_MODELS.get(args.profile, PROFILE_MODELS["max_quality_50gb"])
     repo_ids = sorted(set(profile_models).union(registry_ids.intersection(set(profile_models))))
 
-    est = _estimate_size(repo_ids)
-    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile}, est_size_gb~{est}, quiet={args.quiet})")
+    initial_est = _estimate_size(repo_ids)
+    repo_ids, dropped, est = _cap_models_by_size(repo_ids, args.max_total_gb)
+    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile}, est_size_gb~{est}, cap_gb={args.max_total_gb}, quiet={args.quiet})")
+    if dropped:
+        print(f"[INFO] Trimmed from est_size_gb~{initial_est} to ~{est} by dropping {len(dropped)} model(s):")
+        for rid in dropped:
+            print(f"  - {rid}")
 
     ok = 0
     failed: list[str] = []
