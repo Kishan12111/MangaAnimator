@@ -678,7 +678,7 @@ class MangaVideoPipeline:
             Path to the anime clip, or None on failure.
         """
         from modules.anime_generator import AnimeGenerator
-        from interfaces.base_anime_generator import AnimeConfig, AnimeStyle
+        from interfaces.base_anime_generator import AnimeConfig, AnimeStyle, AnimationMode
 
         style_map = {
             "modern_anime": AnimeStyle.MODERN_ANIME,
@@ -687,6 +687,15 @@ class MangaVideoPipeline:
             "shonen": AnimeStyle.SHONEN,
             "chibi": AnimeStyle.CHIBI,
             "vibrant": AnimeStyle.VIBRANT,
+        }
+
+
+        animation_mode_map = {
+            "static": AnimationMode.STATIC,
+            "ken_burns": AnimationMode.KEN_BURNS,
+            "interpolated": AnimationMode.INTERPOLATED,
+            "animated": AnimationMode.ANIMATED,
+            "puppet": AnimationMode.PUPPET,
         }
 
         style = style_map.get(
@@ -700,6 +709,10 @@ class MangaVideoPipeline:
             num_inference_steps=getattr(self.config, 'anime_steps', 25),
             use_controlnet=getattr(self.config, 'anime_controlnet', True),
             fps=getattr(self.config, 'anime_fps', 24),
+            animation_mode=animation_mode_map.get(
+                getattr(self.config, 'anime_animation_mode', 'ken_burns'),
+                AnimationMode.KEN_BURNS,
+            ),
             width=self.config.video_width,    # Match main video (1080)
             height=self.config.video_height,  # Match main video (1920)
         )

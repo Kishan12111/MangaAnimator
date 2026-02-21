@@ -207,6 +207,9 @@ def api_generate():
     anime_style = request.form.get("anime_style", "modern_anime")
     if anime_style:
         config.anime_style = anime_style
+    anime_animation_mode = request.form.get("anime_animation_mode", "ken_burns")
+    if anime_animation_mode:
+        config.anime_animation_mode = anime_animation_mode
 
     # Voice handling
     if custom_voice_id:
@@ -401,6 +404,9 @@ def api_batch_generate():
     anime_style = request.form.get("anime_style", "modern_anime")
     if anime_style:
         config.anime_style = anime_style
+    anime_animation_mode = request.form.get("anime_animation_mode", "ken_burns")
+    if anime_animation_mode:
+        config.anime_animation_mode = anime_animation_mode
 
     if custom_voice_id:
         config.narrator_voice = custom_voice_id

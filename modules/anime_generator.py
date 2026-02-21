@@ -6,7 +6,7 @@ Converts manga panels into vibrant anime-style images and assembles
 them into a narrated video with cinematic camera motion and audio.
 
 Key improvements over v1:
-  - HuggingFace cache redirected to E: drive (C: has <1 GB)
+  - Cross-platform HuggingFace cache selection (supports Colab/Linux/Windows)
   - Portrait 1080×1920 output matching the main video format
   - Per-panel duration matched to narration audio length
   - Cinematic camera: varied pan, zoom, and parallax per panel
@@ -41,8 +41,28 @@ from interfaces.base_anime_generator import (
 
 logger = logging.getLogger(__name__)
 
-# ── Redirect HuggingFace cache to E: (C: has <1 GB free) ──
-_HF_CACHE = Path("E:/MangaVID/.cache/huggingface")
+def _is_colab_runtime() -> bool:
+    """Return True when running inside Google Colab."""
+    return "COLAB_RELEASE_TAG" in os.environ or "google.colab" in os.environ.get("JPY_PARENT_PID", "")
+
+
+def _resolve_hf_cache_dir() -> Path:
+    """Pick a HuggingFace cache dir compatible with local + Colab environments."""
+    # Allow explicit override first
+    manual = os.environ.get("MANGAVID_HF_CACHE")
+    if manual:
+        return Path(manual).expanduser()
+
+    # In Colab, /content has the most predictable writable space
+    if _is_colab_runtime() or Path("/content").exists():
+        return Path("/content/.cache/huggingface")
+
+    # Cross-platform default
+    return Path.home() / ".cache" / "mangavid" / "huggingface"
+
+
+# ── Cross-platform HuggingFace cache setup ──
+_HF_CACHE = _resolve_hf_cache_dir()
 _HF_CACHE.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("HF_HOME", str(_HF_CACHE))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(_HF_CACHE / "hub"))
@@ -231,9 +251,15 @@ class AnimeGenerator(BaseAnimeGenerator):
         if progress_callback:
             progress_callback("assemble", 0, 1)
         silent_path = output_path.with_stem(output_path.stem + "_silent")
-        video_path = self._assemble_video(
-            frames, silent_path, config, panel_durations
-        )
+        if config.animation_mode == AnimationMode.PUPPET:
+            logger.info("Using puppet animation mode (segment → parts → rig → poses → lip-sync)")
+            video_path = self._assemble_puppet_video(
+                frames, silent_path, config, panel_durations
+            )
+        else:
+            video_path = self._assemble_video(
+                frames, silent_path, config, panel_durations
+            )
         if progress_callback:
             progress_callback("assemble", 1, 1)
 
@@ -719,6 +745,140 @@ class AnimeGenerator(BaseAnimeGenerator):
         # Resize back to original dimensions
         result = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
         return result
+
+    @staticmethod
+    def _split_character_parts(image: np.ndarray) -> Dict[str, np.ndarray]:
+        """Segment a panel into rough puppet parts: head/torso/arms.
+
+        This is a lightweight, model-free heuristic splitter for pipeline compatibility.
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(gray, 245, 255, cv2.THRESH_BINARY_INV)
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        ys, xs = np.where(mask > 0)
+        if len(xs) == 0 or len(ys) == 0:
+            h, w = image.shape[:2]
+            return {
+                "head": image[: h // 3].copy(),
+                "torso": image[h // 3 : (2 * h) // 3].copy(),
+                "arms": image[(2 * h) // 3 :].copy(),
+            }
+
+        x0, x1 = int(xs.min()), int(xs.max())
+        y0, y1 = int(ys.min()), int(ys.max())
+        roi = image[y0:y1 + 1, x0:x1 + 1]
+        rh = roi.shape[0]
+
+        head_end = max(int(rh * 0.28), 1)
+        torso_end = max(int(rh * 0.70), head_end + 1)
+
+        return {
+            "head": roi[:head_end].copy(),
+            "torso": roi[head_end:torso_end].copy(),
+            "arms": roi[torso_end:].copy(),
+        }
+
+    @staticmethod
+    def _compose_puppet_pose(canvas: np.ndarray, parts: Dict[str, np.ndarray], t: float) -> np.ndarray:
+        """Apply a simple rig + pose animation for puppet-style control."""
+        h, w = canvas.shape[:2]
+        out = canvas.copy()
+
+        # rig anchors
+        cx = w // 2
+        y_head = int(h * 0.23)
+        y_torso = int(h * 0.42)
+        y_arms = int(h * 0.60)
+
+        swing = math.sin(t * 2 * math.pi)
+        bob = int(10 * math.sin(t * 2 * math.pi * 0.5))
+
+        def paste_center(img: np.ndarray, x: int, y: int, scale: float = 1.0):
+            if img.size == 0:
+                return
+            ih, iw = img.shape[:2]
+            nw = max(1, int(iw * scale))
+            nh = max(1, int(ih * scale))
+            resized = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_LINEAR)
+            x0 = max(0, x - nw // 2)
+            y0 = max(0, y - nh // 2)
+            x1 = min(w, x0 + nw)
+            y1 = min(h, y0 + nh)
+            out[y0:y1, x0:x1] = resized[: y1 - y0, : x1 - x0]
+
+        paste_center(parts.get("head", np.empty((0, 0, 3))), cx, y_head + bob, 1.0)
+        paste_center(parts.get("torso", np.empty((0, 0, 3))), cx, y_torso, 1.0)
+        paste_center(parts.get("arms", np.empty((0, 0, 3))), cx + int(18 * swing), y_arms, 1.0)
+
+        # lightweight lip-sync cue: oscillate lower-face brightness
+        mouth_h = int(h * 0.05)
+        mouth_y0 = int(h * 0.30)
+        mouth_y1 = min(h, mouth_y0 + mouth_h)
+        amp = 0.85 + 0.25 * (0.5 + 0.5 * math.sin(t * 2 * math.pi * 4.0))
+        out[mouth_y0:mouth_y1] = np.clip(out[mouth_y0:mouth_y1] * amp, 0, 255).astype(np.uint8)
+
+        return out
+
+    def _assemble_puppet_video(
+        self,
+        frames: List[AnimeFrame],
+        output_path: Path,
+        config: AnimeConfig,
+        panel_durations: List[float],
+    ) -> Optional[Path]:
+        """Assemble a puppet-style animation clip with simple segmentation+rigging."""
+        if not frames:
+            return None
+        if not self._ffmpeg_available:
+            logger.warning("FFmpeg not found — saving frames only")
+            self._save_frames(frames, output_path.parent)
+            return None
+
+        fps = config.fps
+        canvas_w, canvas_h = config.width, config.height
+
+        ffmpeg_cmd = [
+            "ffmpeg", "-y",
+            "-f", "rawvideo", "-vcodec", "rawvideo",
+            "-s", f"{canvas_w}x{canvas_h}",
+            "-pix_fmt", "bgr24",
+            "-r", str(fps),
+            "-i", "-",
+            "-c:v", "libx264",
+            "-preset", "fast", "-crf", "18",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+
+        pipe = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        def _write(f: np.ndarray) -> None:
+            if not f.flags["C_CONTIGUOUS"]:
+                f = np.ascontiguousarray(f)
+            pipe.stdin.write(f.tobytes())
+
+        for idx, frame in enumerate(frames):
+            dur = panel_durations[idx] if idx < len(panel_durations) else config.duration_per_panel
+            n = max(1, int(dur * fps))
+            base = self._fit_to_canvas(frame.image, canvas_w, canvas_h)
+            parts = self._split_character_parts(base)
+
+            for f_idx in range(n):
+                t = f_idx / max(n - 1, 1)
+                posed = self._compose_puppet_pose(base, parts, t)
+                _write(posed)
+
+        pipe.stdin.close()
+        rc = pipe.wait()
+        if rc != 0:
+            logger.error(f"FFmpeg puppet encoding failed with exit code {rc}")
+            return None
+
+        logger.info(f"✓ Puppet anime video encoded → {output_path}")
+        return output_path
 
     # ────────────────── Video Assembly ──────────────────
 

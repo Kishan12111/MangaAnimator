@@ -11,6 +11,10 @@ Pillow>=9.0.0
 # Video processing (FFmpeg must be installed separately)
 # Install FFmpeg: https://ffmpeg.org/download.html
 
+
+# Web API / UI
+Flask>=2.3.0
+
 # =======================
 # Recommended dependencies
 # =======================

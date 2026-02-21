@@ -16,6 +16,7 @@ MangaVID is an intelligent pipeline that accepts manga input (ZIP/PDF/folder) an
 - **Automatic Colorization**: Optional AI-powered colorization of B&W manga
 - **Text-to-Speech Narration**: Multiple TTS backends supported
 - **Cinematic Video Generation**: Ken Burns effects, transitions, and subtitles
+- **Puppet Animation Mode**: Industry-style character-part control (segment → split parts → rig → pose → lip-sync)
 - **Platform Upload**: Upload to YouTube, TikTok, and more (coming soon)
 - **Fully Configurable**: All parameters controllable via config.json
 
@@ -57,6 +58,28 @@ pip install numpy opencv-python Pillow pyttsx3
 pip install easyocr  # Better OCR for manga
 pip install openai   # LLM-powered story intelligence
 ```
+
+
+## Google Colab Setup
+
+For Colab compatibility:
+
+```bash
+# In a Colab cell
+!git clone <your-repo-url>
+%cd MangaAnimator
+!bash scripts/setup_colab.sh
+
+# (Optional) enable SD/ControlNet stack for anime mode
+# !INSTALL_DIFFUSION=1 bash scripts/setup_colab.sh
+
+!python app.py
+```
+
+Notes:
+- The app binds to `0.0.0.0:5000` by default.
+- HuggingFace cache is now auto-routed to `/content/.cache/huggingface` on Colab.
+- You can override cache path with `MANGAVID_HF_CACHE`.
 
 ## Usage
 
@@ -381,5 +404,18 @@ Contributions are welcome! Please read our contributing guidelines before submit
 - FFmpeg for video encoding
 - EasyOCR for text extraction
 - All the manga creators whose work inspires this project
-#   M a n g a A n i m a t o r  
+# MangaAnimator
+
+
+
+## Puppet Animation Workflow
+
+When `anime_animation_mode` is set to `puppet`, the anime generator runs a lightweight industry-style control pipeline:
+
+1. Segment characters from each panel.
+2. Split into puppet parts (head, torso, arms).
+3. Rig anchors for each part.
+4. Animate pose using part-level motion (swing + bob).
+5. Apply simple lip-sync cues on the face region.
+6. Render and encode frames to MP4.
  

@@ -3,93 +3,216 @@
   "video_width": 1080,
   "video_height": 1920,
   "video_fps": 30,
-  
   "narration_style": "engaging",
   "tts_model": "elevenlabs",
   "narrator_speed": 1.0,
   "narrator_voice": "chris",
-  "elevenlabs_api_key": "", 
-  
+  "elevenlabs_api_key": "",
   "panel_selection_mode": "hybrid",
   "max_panels": 35,
-  
   "llm_model": "gemini-2.5-flash",
   "gemini_api_key": "",
-  
   "colorization_model": "ddcolor",
   "enable_colorization": true,
-  
   "anime_title": "One Punch Man",
-  
   "character_colors": {
     "Saitama": {
-      "hair": [255, 255, 220],
-      "outfit": [255, 220, 50],
-      "cape": [255, 255, 255],
-      "gloves": [220, 40, 40],
-      "boots": [220, 40, 40],
-      "skin": [255, 220, 185]
+      "hair": [
+        255,
+        255,
+        220
+      ],
+      "outfit": [
+        255,
+        220,
+        50
+      ],
+      "cape": [
+        255,
+        255,
+        255
+      ],
+      "gloves": [
+        220,
+        40,
+        40
+      ],
+      "boots": [
+        220,
+        40,
+        40
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Genos": {
-      "hair": [255, 220, 100],
-      "outfit": [30, 30, 30],
-      "eyes": [255, 180, 50],
-      "skin": [255, 220, 185],
-      "core": [255, 160, 30]
+      "hair": [
+        255,
+        220,
+        100
+      ],
+      "outfit": [
+        30,
+        30,
+        30
+      ],
+      "eyes": [
+        255,
+        180,
+        50
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ],
+      "core": [
+        255,
+        160,
+        30
+      ]
     },
     "Speed-o-Sound Sonic": {
-      "hair": [40, 40, 55],
-      "outfit": [60, 50, 80],
-      "skin": [255, 220, 185]
+      "hair": [
+        40,
+        40,
+        55
+      ],
+      "outfit": [
+        60,
+        50,
+        80
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Fubuki": {
-      "hair": [20, 60, 20],
-      "outfit": [30, 30, 30],
-      "skin": [255, 220, 185]
+      "hair": [
+        20,
+        60,
+        20
+      ],
+      "outfit": [
+        30,
+        30,
+        30
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Tatsumaki": {
-      "hair": [50, 180, 80],
-      "outfit": [20, 20, 20],
-      "skin": [255, 220, 185]
+      "hair": [
+        50,
+        180,
+        80
+      ],
+      "outfit": [
+        20,
+        20,
+        20
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Garou": {
-      "hair": [180, 180, 190],
-      "outfit": [40, 40, 50],
-      "skin": [240, 210, 180]
+      "hair": [
+        180,
+        180,
+        190
+      ],
+      "outfit": [
+        40,
+        40,
+        50
+      ],
+      "skin": [
+        240,
+        210,
+        180
+      ]
     },
     "King": {
-      "hair": [200, 170, 100],
-      "outfit": [160, 140, 100],
-      "skin": [255, 220, 185]
+      "hair": [
+        200,
+        170,
+        100
+      ],
+      "outfit": [
+        160,
+        140,
+        100
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Mumen Rider": {
-      "hair": [60, 40, 30],
-      "outfit": [50, 120, 50],
-      "skin": [255, 220, 185]
+      "hair": [
+        60,
+        40,
+        30
+      ],
+      "outfit": [
+        50,
+        120,
+        50
+      ],
+      "skin": [
+        255,
+        220,
+        185
+      ]
     },
     "Bang": {
-      "hair": [200, 200, 210],
-      "outfit": [40, 40, 40],
-      "skin": [240, 210, 180]
+      "hair": [
+        200,
+        200,
+        210
+      ],
+      "outfit": [
+        40,
+        40,
+        40
+      ],
+      "skin": [
+        240,
+        210,
+        180
+      ]
     }
   },
-  
   "ocr_language": "en",
   "reading_direction": "rtl",
-  
   "enable_transitions": true,
   "enable_zoom_effects": true,
   "transition_duration": 0.5,
-  
   "enable_subtitles": true,
   "subtitle_font_size": 72,
   "subtitle_color": "yellow",
-  
   "output_directory": "outputs",
-  
   "log_level": "INFO",
   "log_file": null,
-  
   "auto_upload": false,
-  "upload_platform": "local"
+  "upload_platform": "local",
+  "enable_anime_gen": false,
+  "anime_style": "modern_anime",
+  "anime_animation_mode": "ken_burns",
+  "anime_strength": 0.65,
+  "anime_steps": 25,
+  "anime_controlnet": true,
+  "anime_fps": 24
 }
