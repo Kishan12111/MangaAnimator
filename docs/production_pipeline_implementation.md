@@ -43,7 +43,7 @@ docs/
 export HF_TOKEN=your_huggingface_token
 
 # Automatic dependency + model setup
-bash scripts/install_colab.sh
+DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
 ```
 
 Notes:
@@ -103,3 +103,10 @@ Configured in `configs/model_registry.yaml` (quality-first references):
 - Depth-Anything V2 Large for depth/parallax
 - SD 2 Inpainting for background completion
 
+
+
+## GPU/VRAM Utilization
+
+- `run_all` now logs GPU device name and VRAM (used/free/total) at startup and per stage.
+- A CUDA warmup matrix multiply runs by default (`quality.force_gpu_warmup=true`) to ensure kernels are active.
+- Tune warmup size via `quality.gpu_warmup_matrix`.

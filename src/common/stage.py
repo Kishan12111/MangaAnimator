@@ -8,6 +8,7 @@ from typing import Any
 from .checkpoint import CheckpointManager, StageCheckpoint
 from .io_utils import read_json, sha256_file, sha256_text, write_json
 from .logger import configure_logging, get_logger
+from .compute_monitor import get_compute_snapshot
 
 
 @dataclass
@@ -67,6 +68,16 @@ def run_stage(
         if context.output_path.exists():
             return read_json(context.output_path)
         return {"stage": context.stage_name, "skipped": True}
+
+    snap = get_compute_snapshot()
+    log.info(
+        "Running stage '%s' on %s (gpu=%s, used_vram=%sGB, free_vram=%sGB)",
+        context.stage_name,
+        snap.device,
+        snap.gpu_name,
+        snap.used_vram_gb,
+        snap.free_vram_gb,
+    )
 
     context.output_path.parent.mkdir(parents=True, exist_ok=True)
     result = compute_fn(context, config)

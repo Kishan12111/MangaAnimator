@@ -12,6 +12,8 @@ quality:
   part_scale: 1.0
   camera_motion_amplitude: 0.14
   default_motion_mode: procedural
+  force_gpu_warmup: true
+  gpu_warmup_matrix: 2048
 
 paths:
   workspace: outputs

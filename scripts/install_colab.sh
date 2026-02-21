@@ -18,6 +18,8 @@ import subprocess, sys
 try:
     import torch
     print("torch already installed:", torch.__version__)
+    if torch.cuda.is_available():
+        print("cuda device:", torch.cuda.get_device_name(0))
 except Exception:
     subprocess.check_call([
         sys.executable,
@@ -41,10 +43,28 @@ python -m pip install -U ultralytics manga-ocr paddleocr timm opencv-python-head
 echo "[6/8] Installing optional animation/audio extras"
 python -m pip install -U onnxruntime-gpu phonemizer librosa
 
-echo "[7/8] Downloading model weights from configs/model_registry.yaml"
-# Set DOWNLOAD_MODELS=0 to skip automatic downloads
+echo "[7/8] Downloading heavyweight model weights"
+# Controls:
+# - DOWNLOAD_MODELS=0 : skip downloads
+# - DOWNLOAD_PROFILE=light|max_quality
+# - DOWNLOAD_STRICT=1 : fail install if any model fails
+# - DOWNLOAD_REPOS=1 : also clone source repos in registry
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
-  python scripts/download_models.py --registry configs/model_registry.yaml --models-dir models/checkpoints --repos-dir models/repos
+  PROFILE="${DOWNLOAD_PROFILE:-max_quality}"
+  STRICT_FLAG=""
+  REPO_FLAG=""
+  if [[ "${DOWNLOAD_STRICT:-0}" == "1" ]]; then
+    STRICT_FLAG="--strict"
+  fi
+  if [[ "${DOWNLOAD_REPOS:-1}" == "1" ]]; then
+    REPO_FLAG="--include-repos"
+  fi
+  python scripts/download_models.py \
+    --registry configs/model_registry.yaml \
+    --models-dir models/checkpoints \
+    --repos-dir models/repos \
+    --profile "${PROFILE}" \
+    ${STRICT_FLAG} ${REPO_FLAG}
 else
   echo "[INFO] Skipping model downloads because DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0}"
 fi

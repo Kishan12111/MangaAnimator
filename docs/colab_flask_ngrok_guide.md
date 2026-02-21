@@ -21,7 +21,7 @@ This guide shows how to run the project in **Google Colab**, start the Flask app
 Run full setup (deps + auto model download from registry):
 
 ```bash
-!bash scripts/install_colab.sh
+!DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
 ```
 
 Optional behavior:
@@ -37,7 +37,7 @@ Optional behavior:
 ```bash
 import os
 os.environ["HF_TOKEN"] = "hf_xxx"
-!bash scripts/install_colab.sh
+!DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
 ```
 
 ## 4) Configure Flask app host/port
@@ -137,7 +137,7 @@ for _ in range(60):
 
 ## 10) Recommended Colab workflow
 
-1. Install: `!bash scripts/install_colab.sh`
+1. Install: `!DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh`
 2. Start Flask in background (`python app.py`)
 3. Create ngrok tunnel (`ngrok.connect(5000)`)
 4. Open public URL
@@ -166,7 +166,7 @@ os.environ["HF_TOKEN"] = "hf_xxx"  # optional
 os.environ["FLASK_HOST"] = "0.0.0.0"
 os.environ["FLASK_PORT"] = "5000"
 
-!bash scripts/install_colab.sh
+!DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
 
 ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN")
 proc = subprocess.Popen(["python", "app.py"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -174,3 +174,17 @@ time.sleep(5)
 url = ngrok.connect(5000, "http")
 print("Open:", url)
 ```
+
+
+## 12) Confirm GPU/VRAM usage logs
+
+The pipeline now logs compute snapshots (device name + used/free VRAM) at startup and each stage.
+
+```bash
+!python -m src.orchestration.run_all --input /content/panel.png --workdir outputs/full_pipeline --config configs/default.yaml
+```
+
+Watch for log lines containing:
+- `Compute detected: device=cuda ...`
+- `Running stage ... used_vram=... free_vram=...`
+- `GPU warmup result: {'warmup': True ...}`

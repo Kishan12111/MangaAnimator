@@ -1,28 +1,28 @@
 panel_understanding:
-  vlm_primary: microsoft/Florence-2-large
+  vlm_primary: llava-hf/llava-v1.6-vicuna-13b-hf
   vlm_fallback: Qwen/Qwen2-VL-7B-Instruct
-  ocr_primary: manga-ocr
-  ocr_fallback: paddleocr
+  ocr_primary: kha-white/manga-ocr-base
+  ocr_fallback: PaddlePaddle/PaddleOCR
 
 character_extraction:
   segmentation_primary: facebook/sam2-hiera-large
-  segmentation_fallback: sam-hq
-  pose_primary: dwpose
-  pose_fallback: openpose
-
-rigging:
-  skinning_solver: geodesic_distance_weighting
-  constraints: [ik, angle_limits, foot_lock]
-
-animation:
-  mode_primary: procedural
-  mode_alt: [template, pose_transfer]
+  segmentation_fallback: syscv-community/sam-hq-vit-huge
+  pose_primary: yzd-v/DWPose
+  pose_fallback: lllyasviel/ControlNet
 
 background:
-  depth_primary: depth-anything/Depth-Anything-V2-Large
+  depth_primary: LiheYoung/depth-anything-large-hf
   inpaint_primary: stabilityai/stable-diffusion-2-inpainting
 
-renderer:
-  compositor: pillow_high_quality
-  encoder_primary: ffmpeg_h264
-  encoder_fallback: gif
+animation:
+  motion_prior_primary: guoyww/animatediff-motion-adapter-v1-5-2
+  base_generation_model: runwayml/stable-diffusion-v1-5
+
+audio_facial:
+  whisper_primary: openai/whisper-large-v3
+
+repos:
+  - https://github.com/facebookresearch/sam2.git
+  - https://github.com/IDEA-Research/DWPose.git
+  - https://github.com/LiheYoung/Depth-Anything.git
+  - https://github.com/guoyww/AnimateDiff.git
