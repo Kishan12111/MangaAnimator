@@ -193,3 +193,6 @@ Watch for log lines containing:
 ## 13) Model names + storage budget
 
 See `docs/model_inventory_and_storage.md` for exact model names and approximate sizes, including the 50GB-safe profile.
+
+
+- Tip: keep Colab output responsive by using `DOWNLOAD_QUIET=1` (default in installer).

@@ -44,3 +44,6 @@ DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/ins
 2. Keep HF cache in one place and clean stale revisions periodically.
 3. Avoid downloading both huge VLMs unless needed.
 4. If needed, mount Google Drive and set model/checkpoint paths there.
+
+
+- Tip: keep Colab output responsive by using `DOWNLOAD_QUIET=1` (default in installer).

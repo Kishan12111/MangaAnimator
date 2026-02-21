@@ -49,6 +49,11 @@ PROFILE_MODELS = {
 }
 
 
+def _log(msg: str, quiet: bool = False) -> None:
+    if not quiet:
+        print(msg)
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     import yaml  # type: ignore
 
@@ -77,7 +82,7 @@ def _flatten_strings(data: Any) -> list[str]:
     return values
 
 
-def _download_hf(repo_id: str, target_dir: Path) -> bool:
+def _download_hf(repo_id: str, target_dir: Path, quiet: bool) -> bool:
     from huggingface_hub import snapshot_download
 
     try:
@@ -88,22 +93,22 @@ def _download_hf(repo_id: str, target_dir: Path) -> bool:
             resume_download=True,
             max_workers=8,
         )
-        print(f"[OK] Downloaded {repo_id}")
+        _log(f"[OK] Downloaded {repo_id}", quiet)
         return True
     except Exception as exc:
         print(f"[WARN] HF download failed for {repo_id}: {exc}")
         return False
 
 
-def _clone_git(url: str, target_dir: Path) -> bool:
+def _clone_git(url: str, target_dir: Path, quiet: bool) -> bool:
     name = url.rstrip("/").split("/")[-1].replace(".git", "")
     dest = target_dir / name
     if dest.exists():
-        print(f"[INFO] Repo already exists: {dest}")
+        _log(f"[INFO] Repo already exists: {dest}", quiet)
         return True
     try:
         subprocess.check_call(["git", "clone", "--depth", "1", url, str(dest)])
-        print(f"[OK] Cloned {url}")
+        _log(f"[OK] Cloned {url}", quiet)
         return True
     except Exception as exc:
         print(f"[WARN] git clone failed for {url}: {exc}")
@@ -127,7 +132,11 @@ def main() -> int:
         help="Download profile",
     )
     parser.add_argument("--strict", action="store_true", help="Fail if any model download fails")
+    parser.add_argument("--quiet", action="store_true", help="Reduce per-model logs to avoid Colab output lag")
     args = parser.parse_args()
+
+    if args.quiet:
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
     registry = _load_yaml(Path(args.registry))
     models_dir = Path(args.models_dir)
@@ -142,12 +151,14 @@ def main() -> int:
     repo_ids = sorted(set(profile_models).union(registry_ids.intersection(set(profile_models))))
 
     est = _estimate_size(repo_ids)
-    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile}, est_size_gb~{est})")
+    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile}, est_size_gb~{est}, quiet={args.quiet})")
 
     ok = 0
     failed: list[str] = []
-    for repo_id in repo_ids:
-        if _download_hf(repo_id, models_dir):
+    for idx, repo_id in enumerate(repo_ids, start=1):
+        if args.quiet:
+            print(f"[INFO] ({idx}/{len(repo_ids)}) downloading {repo_id}")
+        if _download_hf(repo_id, models_dir, quiet=args.quiet):
             ok += 1
         else:
             failed.append(repo_id)
@@ -155,7 +166,7 @@ def main() -> int:
     if args.include_repos:
         repo_urls = registry.get("repos", [])
         for url in repo_urls:
-            _clone_git(url, repos_dir)
+            _clone_git(url, repos_dir, quiet=args.quiet)
 
     print(f"[INFO] Downloaded {ok}/{len(repo_ids)} model repos")
     if failed:
@@ -164,9 +175,9 @@ def main() -> int:
             print(f"  - {item}")
 
     if token := os.environ.get("HF_TOKEN"):
-        print("[INFO] HF_TOKEN detected and used by huggingface_hub.")
+        _log("[INFO] HF_TOKEN detected and used by huggingface_hub.", quiet=args.quiet)
     else:
-        print("[INFO] No HF_TOKEN set. Public models should still download; gated models will fail.")
+        _log("[INFO] No HF_TOKEN set. Public models should still download; gated models will fail.", quiet=args.quiet)
 
     if args.strict and failed:
         return 1

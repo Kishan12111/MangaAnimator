@@ -53,6 +53,10 @@ if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
   PROFILE="${DOWNLOAD_PROFILE:-max_quality_50gb}"
   STRICT_FLAG=""
   REPO_FLAG=""
+  QUIET_FLAG=""
+  if [[ "${DOWNLOAD_QUIET:-1}" == "1" ]]; then
+    QUIET_FLAG="--quiet"
+  fi
   if [[ "${DOWNLOAD_STRICT:-0}" == "1" ]]; then
     STRICT_FLAG="--strict"
   fi
@@ -64,7 +68,7 @@ if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
     --models-dir models/checkpoints \
     --repos-dir models/repos \
     --profile "${PROFILE}" \
-    ${STRICT_FLAG} ${REPO_FLAG}
+    ${STRICT_FLAG} ${REPO_FLAG} ${QUIET_FLAG}
 else
   echo "[INFO] Skipping model downloads because DOWNLOAD_MODELS=${DOWNLOAD_MODELS:-0}"
 fi
