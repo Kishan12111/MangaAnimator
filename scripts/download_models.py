@@ -7,15 +7,46 @@ from pathlib import Path
 from typing import Any
 
 
-EXTRA_MAX_QUALITY_MODELS = [
-    "llava-hf/llava-v1.6-vicuna-13b-hf",
-    "Qwen/Qwen2-VL-7B-Instruct",
-    "facebook/sam2-hiera-large",
-    "LiheYoung/depth-anything-large-hf",
-    "stabilityai/stable-diffusion-2-inpainting",
-    "runwayml/stable-diffusion-v1-5",
-    "openai/whisper-large-v3",
-]
+MODEL_CATALOG = {
+    # repo_id: estimated download size in GB (approx, varies by files selected)
+    "llava-hf/llava-v1.6-vicuna-13b-hf": 26.0,
+    "Qwen/Qwen2-VL-7B-Instruct": 15.0,
+    "facebook/sam2-hiera-large": 2.5,
+    "LiheYoung/depth-anything-large-hf": 1.5,
+    "stabilityai/stable-diffusion-2-inpainting": 7.0,
+    "runwayml/stable-diffusion-v1-5": 4.5,
+    "openai/whisper-large-v3": 3.0,
+    "kha-white/manga-ocr-base": 0.6,
+}
+
+PROFILE_MODELS = {
+    "max_quality": [
+        "llava-hf/llava-v1.6-vicuna-13b-hf",
+        "Qwen/Qwen2-VL-7B-Instruct",
+        "facebook/sam2-hiera-large",
+        "LiheYoung/depth-anything-large-hf",
+        "stabilityai/stable-diffusion-2-inpainting",
+        "runwayml/stable-diffusion-v1-5",
+        "openai/whisper-large-v3",
+        "kha-white/manga-ocr-base",
+    ],
+    "max_quality_50gb": [
+        # curated to stay around ~34-38GB total
+        "Qwen/Qwen2-VL-7B-Instruct",
+        "facebook/sam2-hiera-large",
+        "LiheYoung/depth-anything-large-hf",
+        "stabilityai/stable-diffusion-2-inpainting",
+        "runwayml/stable-diffusion-v1-5",
+        "openai/whisper-large-v3",
+        "kha-white/manga-ocr-base",
+    ],
+    "light": [
+        "facebook/sam2-hiera-large",
+        "LiheYoung/depth-anything-large-hf",
+        "runwayml/stable-diffusion-v1-5",
+        "kha-white/manga-ocr-base",
+    ],
+}
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -79,13 +110,22 @@ def _clone_git(url: str, target_dir: Path) -> bool:
         return False
 
 
+def _estimate_size(repo_ids: list[str]) -> float:
+    return round(sum(MODEL_CATALOG.get(repo_id, 2.0) for repo_id in repo_ids), 2)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download model weights listed in configs/model_registry.yaml")
     parser.add_argument("--registry", default="configs/model_registry.yaml")
     parser.add_argument("--models-dir", default="models/checkpoints")
     parser.add_argument("--repos-dir", default="models/repos")
     parser.add_argument("--include-repos", action="store_true", help="Also clone known source repos")
-    parser.add_argument("--profile", default="max_quality", choices=["max_quality", "light"], help="Download profile")
+    parser.add_argument(
+        "--profile",
+        default="max_quality_50gb",
+        choices=["max_quality", "max_quality_50gb", "light"],
+        help="Download profile",
+    )
     parser.add_argument("--strict", action="store_true", help="Fail if any model download fails")
     args = parser.parse_args()
 
@@ -96,12 +136,13 @@ def main() -> int:
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     strings = _flatten_strings(registry)
-    repo_ids = {s for s in strings if _is_hf_repo(s)}
-    if args.profile == "max_quality":
-        repo_ids.update(EXTRA_MAX_QUALITY_MODELS)
+    registry_ids = {s for s in strings if _is_hf_repo(s)}
 
-    repo_ids = sorted(repo_ids)
-    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile})")
+    profile_models = PROFILE_MODELS.get(args.profile, PROFILE_MODELS["max_quality_50gb"])
+    repo_ids = sorted(set(profile_models).union(registry_ids.intersection(set(profile_models))))
+
+    est = _estimate_size(repo_ids)
+    print(f"[INFO] Targeting {len(repo_ids)} model repos (profile={args.profile}, est_size_gb~{est})")
 
     ok = 0
     failed: list[str] = []

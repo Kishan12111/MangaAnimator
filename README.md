@@ -426,3 +426,10 @@ If you want to expose the Flask app publicly from Colab, follow:
 - `docs/colab_flask_ngrok_guide.md`
 
 It includes end-to-end setup (install, model downloads, Flask startup, ngrok tunnel, troubleshooting).
+
+
+## Model inventory and storage
+
+For exact model names and a Colab 50GB-safe download profile, see:
+
+- `docs/model_inventory_and_storage.md`

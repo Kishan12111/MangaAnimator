@@ -43,7 +43,7 @@ docs/
 export HF_TOKEN=your_huggingface_token
 
 # Automatic dependency + model setup
-DOWNLOAD_PROFILE=max_quality DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
+DOWNLOAD_PROFILE=max_quality_50gb DOWNLOAD_REPOS=1 DOWNLOAD_STRICT=1 bash scripts/install_colab.sh
 ```
 
 Notes:
@@ -110,3 +110,9 @@ Configured in `configs/model_registry.yaml` (quality-first references):
 - `run_all` now logs GPU device name and VRAM (used/free/total) at startup and per stage.
 - A CUDA warmup matrix multiply runs by default (`quality.force_gpu_warmup=true`) to ensure kernels are active.
 - Tune warmup size via `quality.gpu_warmup_matrix`.
+
+
+## Model Inventory and 50GB Budget
+
+- See `docs/model_inventory_and_storage.md` for exact model list and size estimates.
+- Default installer profile is now `max_quality_50gb` to fit Colab storage limits.

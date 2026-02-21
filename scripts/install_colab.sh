@@ -43,14 +43,14 @@ python -m pip install -U ultralytics manga-ocr paddleocr timm opencv-python-head
 echo "[6/8] Installing optional animation/audio extras"
 python -m pip install -U onnxruntime-gpu phonemizer librosa
 
-echo "[7/8] Downloading heavyweight model weights"
+echo "[7/8] Downloading heavyweight model weights (50GB-safe default profile)"
 # Controls:
 # - DOWNLOAD_MODELS=0 : skip downloads
 # - DOWNLOAD_PROFILE=light|max_quality
 # - DOWNLOAD_STRICT=1 : fail install if any model fails
 # - DOWNLOAD_REPOS=1 : also clone source repos in registry
 if [[ "${DOWNLOAD_MODELS:-1}" == "1" ]]; then
-  PROFILE="${DOWNLOAD_PROFILE:-max_quality}"
+  PROFILE="${DOWNLOAD_PROFILE:-max_quality_50gb}"
   STRICT_FLAG=""
   REPO_FLAG=""
   if [[ "${DOWNLOAD_STRICT:-0}" == "1" ]]; then
