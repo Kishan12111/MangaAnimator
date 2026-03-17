@@ -1,0 +1,1 @@
+"""Character extraction package."""

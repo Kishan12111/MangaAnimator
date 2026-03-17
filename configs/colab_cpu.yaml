@@ -1,0 +1,9 @@
+runtime:
+  profile: colab_cpu
+  device: cpu
+  mixed_precision: fp32
+  batch_size: 1
+
+execution:
+  resume: true
+  debug: true

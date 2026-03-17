@@ -419,3 +419,10 @@ When `anime_animation_mode` is set to `puppet`, the anime generator runs a light
 5. Apply simple lip-sync cues on the face region.
 6. Render and encode frames to MP4.
  
+
+
+## Colab Production Guide
+
+For Colab setup, model list, storage cap (`<=60GB`), GPU log verification, and optional Flask+ngrok exposure, use:
+
+- `docs/production_pipeline_implementation.md`
